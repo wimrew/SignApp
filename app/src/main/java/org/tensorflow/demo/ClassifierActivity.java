@@ -18,6 +18,7 @@ package org.tensorflow.demo;
 
 import android.graphics.Bitmap;
 import android.graphics.Bitmap.Config;
+import android.graphics.BitmapFactory;
 import android.graphics.Canvas;
 import android.graphics.Matrix;
 import android.graphics.Paint;
@@ -26,38 +27,50 @@ import android.media.Image;
 import android.media.Image.Plane;
 import android.media.ImageReader;
 import android.media.ImageReader.OnImageAvailableListener;
+import android.os.Bundle;
 import android.os.SystemClock;
 import android.os.Trace;
+import android.util.Log;
 import android.util.Size;
 import android.util.TypedValue;
 import android.view.Display;
+import android.view.View;
+import android.widget.ImageView;
+
 import java.util.List;
 import java.util.Vector;
+
 import org.tensorflow.demo.OverlayView.DrawCallback;
 import org.tensorflow.demo.env.BorderedText;
 import org.tensorflow.demo.env.ImageUtils;
 import org.tensorflow.demo.env.Logger;
-import org.tensorflow.demo.R;
+
+import butterknife.BindView;
+import butterknife.ButterKnife;
+import butterknife.OnClick;
 
 public class ClassifierActivity extends CameraActivity implements OnImageAvailableListener {
-  private static final Logger LOGGER = new Logger();
+    private static final Logger LOGGER = new Logger();
 
-  // These are the settings for the original v1 Inception model. If you want to
-  // use a model that's been produced from the TensorFlow for Poets codelab,
-  // you'll need to set IMAGE_SIZE = 299, IMAGE_MEAN = 128, IMAGE_STD = 128,
-  // INPUT_NAME = "Mul:0", and OUTPUT_NAME = "final_result:0".
-  // You'll also need to update the MODEL_FILE and LABEL_FILE paths to point to
-  // the ones you produced.
-  //
-  // To use v3 Inception model, strip the DecodeJpeg Op from your retrained
-  // model first:
-  //
-  // python strip_unused.py \
-  // --input_graph=<retrained-pb-file> \
-  // --output_graph=<your-stripped-pb-file> \
-  // --input_node_names="Mul" \
-  // --output_node_names="final_result" \
-  // --input_binary=true
+    // These are the settings for the original v1 Inception model. If you want to
+    // use a model that's been produced from the TensorFlow for Poets codelab,
+    // you'll need to set IMAGE_SIZE = 299, IMAGE_MEAN = 128, IMAGE_STD = 128,
+    // INPUT_NAME = "Mul:0", and OUTPUT_NAME = "final_result:0".
+    // You'll also need to update the MODEL_FILE and LABEL_FILE paths to point to
+    // the ones you produced.
+    //
+    // To use v3 Inception model, strip the DecodeJpeg Op from your retrained
+    // model first:
+    //
+    // python strip_unused.py \
+    // --input_graph=<retrained-pb-file> \
+    // --output_graph=<your-stripped-pb-file> \
+    // --input_node_names="Mul" \
+    // --output_node_names="final_result" \
+    // --input_binary=true
+
+    ///original values///
+/*
   private static final int INPUT_SIZE = 224;
   private static final int IMAGE_MEAN = 117;
   private static final float IMAGE_STD = 1;
@@ -67,211 +80,305 @@ public class ClassifierActivity extends CameraActivity implements OnImageAvailab
   private static final String MODEL_FILE = "file:///android_asset/tensorflow_inception_graph.pb";
   private static final String LABEL_FILE =
       "file:///android_asset/imagenet_comp_graph_label_strings.txt";
+*/
 
-  private static final boolean SAVE_PREVIEW_BITMAP = false;
+    ///new values///
 
-  private static final boolean MAINTAIN_ASPECT = true;
+    private static final int INPUT_SIZE = 299;
+    private static final int IMAGE_MEAN = 128;
+    private static final float IMAGE_STD = 128;
+    private static final String INPUT_NAME = "Mul";
+    private static final String OUTPUT_NAME = "final_result";
 
-  private Classifier classifier;
+    private static final String MODEL_FILE = "file:///android_asset/retrained_graph_optimized.pb";
+    private static final String LABEL_FILE =
+            "file:///android_asset/retrained_labels.txt";
 
-  private Integer sensorOrientation;
+    ////new values end///
 
-  private int previewWidth = 0;
-  private int previewHeight = 0;
-  private byte[][] yuvBytes;
-  private int[] rgbBytes = null;
-  private Bitmap rgbFrameBitmap = null;
-  private Bitmap croppedBitmap = null;
+    private static final boolean SAVE_PREVIEW_BITMAP = false;
 
-  private Bitmap cropCopyBitmap;
+    private static final boolean MAINTAIN_ASPECT = true;
 
-  private boolean computing = false;
+    private Classifier classifier;
 
-  private Matrix frameToCropTransform;
-  private Matrix cropToFrameTransform;
+    private Integer sensorOrientation;
 
-  private ResultsView resultsView;
+    private int previewWidth = 0;
+    private int previewHeight = 0;
+    private byte[][] yuvBytes;
+    private int[] rgbBytes = null;
+    private Bitmap rgbFrameBitmap = null;
+    private Bitmap croppedBitmap = null;
 
-  private BorderedText borderedText;
+    private Bitmap cropCopyBitmap;
 
-  private long lastProcessingTimeMs;
+    private boolean computing = false;
 
-  @Override
-  protected int getLayoutId() {
-    return R.layout.camera_connection_fragment;
-  }
+    private Matrix frameToCropTransform;
+    private Matrix cropToFrameTransform;
 
-  @Override
-  protected int getDesiredPreviewFrameSize() {
-    return INPUT_SIZE;
-  }
+    private ResultsView resultsView;
 
-  private static final float TEXT_SIZE_DIP = 10;
+    private BorderedText borderedText;
 
-  @Override
-  public void onPreviewSizeChosen(final Size size, final int rotation) {
-    final float textSizePx =
-        TypedValue.applyDimension(
-            TypedValue.COMPLEX_UNIT_DIP, TEXT_SIZE_DIP, getResources().getDisplayMetrics());
-    borderedText = new BorderedText(textSizePx);
-    borderedText.setTypeface(Typeface.MONOSPACE);
+    private long lastProcessingTimeMs;
 
-    classifier =
-        TensorFlowImageClassifier.create(
-            getAssets(),
-            MODEL_FILE,
-            LABEL_FILE,
-            INPUT_SIZE,
-            IMAGE_MEAN,
-            IMAGE_STD,
-            INPUT_NAME,
-            OUTPUT_NAME);
+    private HololensCommunication hololensCommunication;
 
-    resultsView = (ResultsView) findViewById(R.id.results);
-    previewWidth = size.getWidth();
-    previewHeight = size.getHeight();
+    Bitmap bm;
+    String baseAddress = "http://172.19.224.33" + ":" +
+            "5555" + "/";
+    boolean sendingResultsToHololens = false;
 
-    final Display display = getWindowManager().getDefaultDisplay();
-    final int screenOrientation = display.getRotation();
+    @BindView(R.id.picturetorecognize)
+    ImageView pictureToRecognize;
 
-    LOGGER.i("Sensor orientation: %d, Screen orientation: %d", rotation, screenOrientation);
+    @OnClick(R.id.getimage)
+    public void submit(View view) {
+        Log.d("message", "in onClick buttonsend");
 
-    sensorOrientation = rotation + screenOrientation;
-
-    LOGGER.i("Initializing at size %dx%d", previewWidth, previewHeight);
-    rgbBytes = new int[previewWidth * previewHeight];
-    rgbFrameBitmap = Bitmap.createBitmap(previewWidth, previewHeight, Config.ARGB_8888);
-    croppedBitmap = Bitmap.createBitmap(INPUT_SIZE, INPUT_SIZE, Config.ARGB_8888);
-
-    frameToCropTransform =
-        ImageUtils.getTransformationMatrix(
-            previewWidth, previewHeight,
-            INPUT_SIZE, INPUT_SIZE,
-            sensorOrientation, MAINTAIN_ASPECT);
-
-    cropToFrameTransform = new Matrix();
-    frameToCropTransform.invert(cropToFrameTransform);
-
-    yuvBytes = new byte[3][];
-
-    addCallback(
-        new DrawCallback() {
-          @Override
-          public void drawCallback(final Canvas canvas) {
-            renderDebug(canvas);
-          }
-        });
-  }
-
-  @Override
-  public void onImageAvailable(final ImageReader reader) {
-    Image image = null;
-
-    try {
-      image = reader.acquireLatestImage();
-
-      if (image == null) {
-        return;
-      }
-
-      if (computing) {
-        image.close();
-        return;
-      }
-      computing = true;
-
-      Trace.beginSection("imageAvailable");
-
-      final Plane[] planes = image.getPlanes();
-      fillBytes(planes, yuvBytes);
-
-      final int yRowStride = planes[0].getRowStride();
-      final int uvRowStride = planes[1].getRowStride();
-      final int uvPixelStride = planes[1].getPixelStride();
-      ImageUtils.convertYUV420ToARGB8888(
-          yuvBytes[0],
-          yuvBytes[1],
-          yuvBytes[2],
-          rgbBytes,
-          previewWidth,
-          previewHeight,
-          yRowStride,
-          uvRowStride,
-          uvPixelStride,
-          false);
-
-      image.close();
-    } catch (final Exception e) {
-      if (image != null) {
-        image.close();
-      }
-      LOGGER.e(e, "Exception!");
-      Trace.endSection();
-      return;
+        hololensCommunication.setBaseAddress(baseAddress);
+        String url = baseAddress +
+                "toggleVisibility";
+        String message = "{}";
+        hololensCommunication.sendToHoloLens(url, message);
     }
 
-    rgbFrameBitmap.setPixels(rgbBytes, 0, previewWidth, 0, 0, previewWidth, previewHeight);
-    final Canvas canvas = new Canvas(croppedBitmap);
-    canvas.drawBitmap(rgbFrameBitmap, frameToCropTransform, null);
-
-    // For examining the actual TF input.
-    if (SAVE_PREVIEW_BITMAP) {
-      ImageUtils.saveBitmap(croppedBitmap);
+    @Override
+    protected void onCreate(Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
+        ButterKnife.bind(this);
+        hololensCommunication = new HololensCommunication(this, "http://172.19.224.33:5555/", null);
+        // submit(null);
     }
 
-    runInBackground(
-        new Runnable() {
-          @Override
-          public void run() {
-            final long startTime = SystemClock.uptimeMillis();
-            final List<Classifier.Recognition> results = classifier.recognizeImage(croppedBitmap);
-            lastProcessingTimeMs = SystemClock.uptimeMillis() - startTime;
+    @Override
+    protected int getLayoutId() {
 
-            cropCopyBitmap = Bitmap.createBitmap(croppedBitmap);
-            resultsView.setResults(results);
-            requestRender();
-            computing = false;
-          }
-        });
+        return R.layout.camera_connection_fragment;
 
-    Trace.endSection();
-  }
-
-  @Override
-  public void onSetDebug(boolean debug) {
-    classifier.enableStatLogging(debug);
-  }
-
-  private void renderDebug(final Canvas canvas) {
-    if (!isDebug()) {
-      return;
     }
-    final Bitmap copy = cropCopyBitmap;
-    if (copy != null) {
-      final Matrix matrix = new Matrix();
-      final float scaleFactor = 2;
-      matrix.postScale(scaleFactor, scaleFactor);
-      matrix.postTranslate(
-          canvas.getWidth() - copy.getWidth() * scaleFactor,
-          canvas.getHeight() - copy.getHeight() * scaleFactor);
-      canvas.drawBitmap(copy, matrix, new Paint());
 
-      final Vector<String> lines = new Vector<String>();
-      if (classifier != null) {
-        String statString = classifier.getStatString();
-        String[] statLines = statString.split("\n");
-        for (String line : statLines) {
-          lines.add(line);
+    @Override
+    protected int getDesiredPreviewFrameSize() {
+        return INPUT_SIZE;
+    }
+
+    private static final float TEXT_SIZE_DIP = 10;
+
+    @Override
+    public void onPreviewSizeChosen(final Size size, final int rotation) {
+        final float textSizePx =
+                TypedValue.applyDimension(
+                        TypedValue.COMPLEX_UNIT_DIP, TEXT_SIZE_DIP, getResources().getDisplayMetrics());
+        borderedText = new BorderedText(textSizePx);
+        borderedText.setTypeface(Typeface.MONOSPACE);
+
+        classifier =
+                TensorFlowImageClassifier.create(
+                        getAssets(),
+                        MODEL_FILE,
+                        LABEL_FILE,
+                        INPUT_SIZE,
+                        IMAGE_MEAN,
+                        IMAGE_STD,
+                        INPUT_NAME,
+                        OUTPUT_NAME);
+
+        resultsView = (ResultsView) findViewById(R.id.results);
+        previewWidth = size.getWidth();
+        previewHeight = size.getHeight();
+
+        final Display display = getWindowManager().getDefaultDisplay();
+        final int screenOrientation = display.getRotation();
+
+        LOGGER.i("Sensor orientation: %d, Screen orientation: %d", rotation, screenOrientation);
+
+        sensorOrientation = rotation + screenOrientation;
+
+        LOGGER.i("Initializing at size %dx%d", previewWidth, previewHeight);
+        rgbBytes = new int[previewWidth * previewHeight];
+        rgbFrameBitmap = Bitmap.createBitmap(previewWidth, previewHeight, Config.ARGB_8888);
+        croppedBitmap = Bitmap.createBitmap(INPUT_SIZE, INPUT_SIZE, Config.ARGB_8888);
+
+        frameToCropTransform =
+                ImageUtils.getTransformationMatrix(
+                        previewWidth, previewHeight,
+                        INPUT_SIZE, INPUT_SIZE,
+                        sensorOrientation, MAINTAIN_ASPECT);
+
+        cropToFrameTransform = new Matrix();
+        frameToCropTransform.invert(cropToFrameTransform);
+
+        yuvBytes = new byte[3][];
+
+        addCallback(
+                new DrawCallback() {
+                    @Override
+                    public void drawCallback(final Canvas canvas) {
+                        renderDebug(canvas);
+                    }
+                });
+    }
+
+    @Override
+    public void onImageAvailable(final ImageReader reader) {
+        Image image = null;
+
+        try {
+            image = reader.acquireLatestImage();
+
+            if (image == null) {
+                return;
+            }
+
+            if (computing) {
+                image.close();
+                return;
+            }
+            computing = true;
+
+            Trace.beginSection("imageAvailable");
+
+            final Plane[] planes = image.getPlanes();
+            fillBytes(planes, yuvBytes);
+
+            final int yRowStride = planes[0].getRowStride();
+            final int uvRowStride = planes[1].getRowStride();
+            final int uvPixelStride = planes[1].getPixelStride();
+            ImageUtils.convertYUV420ToARGB8888(
+                    yuvBytes[0],
+                    yuvBytes[1],
+                    yuvBytes[2],
+                    rgbBytes,
+                    previewWidth,
+                    previewHeight,
+                    yRowStride,
+                    uvRowStride,
+                    uvPixelStride,
+                    false);
+
+            image.close();
+        } catch (final Exception e) {
+            if (image != null) {
+                image.close();
+            }
+            LOGGER.e(e, "Exception!");
+            Trace.endSection();
+            return;
         }
-      }
 
-      lines.add("Frame: " + previewWidth + "x" + previewHeight);
-      lines.add("Crop: " + copy.getWidth() + "x" + copy.getHeight());
-      lines.add("View: " + canvas.getWidth() + "x" + canvas.getHeight());
-      lines.add("Rotation: " + sensorOrientation);
-      lines.add("Inference time: " + lastProcessingTimeMs + "ms");
+        rgbFrameBitmap.setPixels(rgbBytes, 0, previewWidth, 0, 0, previewWidth, previewHeight);
+        final Canvas canvas = new Canvas(croppedBitmap);
+        canvas.drawBitmap(rgbFrameBitmap, frameToCropTransform, null);
 
-      borderedText.drawLines(canvas, 10, canvas.getHeight() - 10, lines);
+        // For examining the actual TF input.
+        if (SAVE_PREVIEW_BITMAP) {
+            ImageUtils.saveBitmap(croppedBitmap);
+        }
+
+        runInBackground(
+                new Runnable() {
+                    @Override
+                    public void run() {
+                        final long startTime = SystemClock.uptimeMillis();
+
+                        ///////////////////////////////////////////////
+
+                        Bitmap myCroppedBitmap = Bitmap.createBitmap(INPUT_SIZE, INPUT_SIZE, Config.ARGB_8888);
+                        final Canvas canvas = new Canvas(croppedBitmap);
+                        //  canvas.drawBitmap(rgbFrameBitmap, frameToCropTransform, null);
+                        bm = BitmapFactory.decodeResource(getResources(), R.drawable.daisy_example);
+
+                        if (hololensCommunication.hasNewImage()) {
+
+                            Log.d("message", "Deserialization successful");
+                            bm = hololensCommunication.getDeserializedImage();
+                            showReceivedPicture(bm);
+
+
+                            ;
+
+
+                            Bitmap mutableBitmap = bm.copy(Bitmap.Config.ARGB_8888, true);
+//bm.setConfig(Config.ARGB_8888);
+                            Bitmap toRecognizeBitmap = Bitmap.createScaledBitmap(mutableBitmap, INPUT_SIZE, INPUT_SIZE, false);
+                            //   mutableBitmap.setHeight(INPUT_SIZE);
+                            //   mutableBitmap.setWidth(INPUT_SIZE);
+
+                            //
+                            final List<Classifier.Recognition> results = classifier.recognizeImage(toRecognizeBitmap);
+                            ///////////////////////////////////////////////
+                            //      final List<Classifier.Recognition> results = classifier.recognizeImage(croppedBitmap);
+
+                            lastProcessingTimeMs = SystemClock.uptimeMillis() - startTime;
+
+                            cropCopyBitmap = Bitmap.createBitmap(croppedBitmap);
+                            resultsView.setResults(results);
+                            String url = baseAddress +
+                                    "sendResult";
+                            String result = results.get(0).getTitle();
+                            String message = "{\"result\":\"" + result + "\"}";
+                            hololensCommunication.sendToHoloLensPost(url, message);
+
+                            hololensCommunication.setNewImage(false);
+
+                        }
+                        requestRender();
+                        computing = false;
+                    }
+                });
+
+        Trace.endSection();
     }
-  }
+
+    private void showReceivedPicture(Bitmap image) {
+        this.runOnUiThread(new Runnable() {
+            @Override
+            public void run() {
+                pictureToRecognize.setImageBitmap(bm);
+            }
+        });
+
+
+    }
+
+    @Override
+    public void onSetDebug(boolean debug) {
+        classifier.enableStatLogging(debug);
+    }
+
+    private void renderDebug(final Canvas canvas) {
+        if (!isDebug()) {
+            return;
+        }
+        final Bitmap copy = cropCopyBitmap;
+        if (copy != null) {
+            final Matrix matrix = new Matrix();
+            final float scaleFactor = 2;
+            matrix.postScale(scaleFactor, scaleFactor);
+            matrix.postTranslate(
+                    canvas.getWidth() - copy.getWidth() * scaleFactor,
+                    canvas.getHeight() - copy.getHeight() * scaleFactor);
+            canvas.drawBitmap(copy, matrix, new Paint());
+
+            final Vector<String> lines = new Vector<String>();
+            if (classifier != null) {
+                String statString = classifier.getStatString();
+                String[] statLines = statString.split("\n");
+                for (String line : statLines) {
+                    lines.add(line);
+                }
+            }
+
+            lines.add("Frame: " + previewWidth + "x" + previewHeight);
+            lines.add("Crop: " + copy.getWidth() + "x" + copy.getHeight());
+            lines.add("View: " + canvas.getWidth() + "x" + canvas.getHeight());
+            lines.add("Rotation: " + sensorOrientation);
+            lines.add("Inference time: " + lastProcessingTimeMs + "ms");
+
+            borderedText.drawLines(canvas, 10, canvas.getHeight() - 10, lines);
+        }
+    }
 }
