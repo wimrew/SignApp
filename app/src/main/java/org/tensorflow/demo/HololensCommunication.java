@@ -86,7 +86,6 @@ boolean newImage =false;
 
     void sendToHoloLens(String url, String message) {
         Log.d("message", url);
-        //  RequestParams params = new RequestParams("body", new JSONObject());
         StringEntity entity = null;
 
         try {
@@ -110,35 +109,18 @@ boolean newImage =false;
                 Log.d("message", "onSuccess body length: " + responseString.length());
                 int t = 0;
                 int j = 100;
-                /*
-                while (j < responseString.length()) {
 
-                    Log.d("message " + t, "" + responseString.substring(t, j));
-                    j += 100;
-                    t += 100;
-                }
-
-                Log.d("message " + t, "" + responseString.substring(t, responseString.length()));
-*/
 
                 byte[] decodedImage = Base64.decode(responseString, Base64.DEFAULT);
 
 
                 String imageAsString = "";
-/*
-                for (int i = 0; i < decodedImage.length; i++) {
-                    imageAsString += decodedImage[i] + " ";
-                }
-                Log.d("message", "decoded int byte arrayAsString: " + imageAsString);
-*/
+
                 Log.d("message", "decoded int byte array: " + decodedImage);
                 deserializedImage = BitmapFactory.decodeByteArray(decodedImage, 0, decodedImage.length);
                 Log.d("message", "The deserializedImage: " + deserializedImage);
                 setNewImage(true);
-/*
-                imageView.setImageBitmap(Bitmap.createScaledBitmap(deserializedImage, imageView.getWidth(),
-                        imageView.getHeight(), false));
-                */
+
             }
         });
     }

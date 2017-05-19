@@ -28,6 +28,7 @@ import android.media.Image.Plane;
 import android.media.ImageReader;
 import android.media.ImageReader.OnImageAvailableListener;
 import android.os.Bundle;
+import android.os.Handler;
 import android.os.SystemClock;
 import android.os.Trace;
 import android.util.Log;
@@ -125,6 +126,8 @@ public class ClassifierActivity extends CameraActivity implements OnImageAvailab
     private long lastProcessingTimeMs;
 
     private HololensCommunication hololensCommunication;
+    private int interval = 1000; // 5 seconds by default, can be changed later
+    private Handler handler;
 
     Bitmap bm;
     String baseAddress = "http://172.19.224.33" + ":" +
@@ -138,6 +141,10 @@ public class ClassifierActivity extends CameraActivity implements OnImageAvailab
     public void submit(View view) {
         Log.d("message", "in onClick buttonsend");
 
+        requestImageFromHololens();
+    }
+
+    private void requestImageFromHololens() {
         hololensCommunication.setBaseAddress(baseAddress);
         String url = baseAddress +
                 "toggleVisibility";
@@ -150,6 +157,8 @@ public class ClassifierActivity extends CameraActivity implements OnImageAvailab
         super.onCreate(savedInstanceState);
         ButterKnife.bind(this);
         hololensCommunication = new HololensCommunication(this, "http://172.19.224.33:5555/", null);
+        handler = new Handler();
+        startRepeatingTask();
         // submit(null);
     }
 
@@ -297,17 +306,10 @@ public class ClassifierActivity extends CameraActivity implements OnImageAvailab
                             bm = hololensCommunication.getDeserializedImage();
                             showReceivedPicture(bm);
 
-
-                            ;
-
-
                             Bitmap mutableBitmap = bm.copy(Bitmap.Config.ARGB_8888, true);
-//bm.setConfig(Config.ARGB_8888);
-                            Bitmap toRecognizeBitmap = Bitmap.createScaledBitmap(mutableBitmap, INPUT_SIZE, INPUT_SIZE, false);
-                            //   mutableBitmap.setHeight(INPUT_SIZE);
-                            //   mutableBitmap.setWidth(INPUT_SIZE);
 
-                            //
+                            Bitmap toRecognizeBitmap = Bitmap.createScaledBitmap(mutableBitmap, INPUT_SIZE, INPUT_SIZE, false);
+
                             final List<Classifier.Recognition> results = classifier.recognizeImage(toRecognizeBitmap);
                             ///////////////////////////////////////////////
                             //      final List<Classifier.Recognition> results = classifier.recognizeImage(croppedBitmap);
@@ -321,7 +323,7 @@ public class ClassifierActivity extends CameraActivity implements OnImageAvailab
                             String result = results.get(0).getTitle();
                             String message = "{\"result\":\"" + result + "\"}";
                             hololensCommunication.sendToHoloLensPost(url, message);
-
+                            Log.d("message", "post message sent to Holocommunication");
                             hololensCommunication.setNewImage(false);
 
                         }
@@ -380,5 +382,33 @@ public class ClassifierActivity extends CameraActivity implements OnImageAvailab
 
             borderedText.drawLines(canvas, 10, canvas.getHeight() - 10, lines);
         }
+    }
+
+    Runnable repeatingRunnable = new Runnable() {
+        @Override
+        public void run() {
+            try {
+              requestImageFromHololens();
+            } finally {
+                // 100% guarantee that this always happens, even if
+                // your update method throws an exception
+                handler.postDelayed(repeatingRunnable, interval);
+            }
+        }
+    };
+
+
+    void startRepeatingTask() {
+        repeatingRunnable.run();
+    }
+
+    void stopRepeatingTask() {
+        handler.removeCallbacks(repeatingRunnable);
+    }
+
+    @Override
+    public void onDestroy() {
+        super.onDestroy();
+        stopRepeatingTask();
     }
 }
