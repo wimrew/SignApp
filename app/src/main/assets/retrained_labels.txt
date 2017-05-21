@@ -1,5 +1,4 @@
-tulips
-roses
-dandelion
-sunflowers
-daisy
+hammer
+drill machine
+ammeter
+electrical engine
