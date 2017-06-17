@@ -84,6 +84,7 @@ public class ClassifierActivity extends CameraActivity implements OnImageAvailab
 */
 
     ///new values///
+    ////// UNCOMMENT AFTER TECHSYLVANIA
 
     private static final int INPUT_SIZE = 299;
     private static final int IMAGE_MEAN = 128;
@@ -91,11 +92,35 @@ public class ClassifierActivity extends CameraActivity implements OnImageAvailab
     private static final String INPUT_NAME = "Mul";
     private static final String OUTPUT_NAME = "final_result";
 
+
+
+/*
     private static final String MODEL_FILE = "file:///android_asset/retrained_graph_optimized.pb";
     private static final String LABEL_FILE =
             "file:///android_asset/retrained_labels.txt";
+*/
+
+    ///////FOR TECHSYLVANIA
+
+
+    ////////////////////
 
     ////new values end///
+
+
+    ///with background
+//UNCOMMENT AFTER TECHSYLVANIA
+ //   private static final String MODEL_FILE = "file:///android_asset/retrained_graph_background_optimized.pb";
+ //   private static final String LABEL_FILE =
+ //           "file:///android_asset/retrained_labels_background.txt";
+    ///with background end
+
+//TECHSYLVANIA
+    private static final String MODEL_FILE = "file:///android_asset/retrained_graph_blind_optimized.pb";
+    private static final String LABEL_FILE =
+            "file:///android_asset/retrained_labels_blind.txt";
+//TECHSYLVANIA END
+
 
     private static final boolean SAVE_PREVIEW_BITMAP = false;
 
@@ -130,7 +155,7 @@ public class ClassifierActivity extends CameraActivity implements OnImageAvailab
     private Handler handler;
 
     Bitmap bm;
-    String baseAddress = "http://172.19.224.33" + ":" +
+    String baseAddress = "http://192.168.43.166" + ":" +
             "5555" + "/";
     boolean sendingResultsToHololens = false;
 
@@ -156,7 +181,7 @@ public class ClassifierActivity extends CameraActivity implements OnImageAvailab
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         ButterKnife.bind(this);
-        hololensCommunication = new HololensCommunication(this, "http://172.19.224.33:5555/", null);
+        hololensCommunication = new HololensCommunication(this, "http://192.168.43.166:5555/", null);
         handler = new Handler();
         startRepeatingTask();
         // submit(null);
