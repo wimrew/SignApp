@@ -24,12 +24,17 @@
     <uses-permission android:name="android.permission.CAMERA" />
     <uses-feature android:name="android.hardware.camera" />
     <uses-feature android:name="android.hardware.camera.autofocus" />
-    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE"/>
+
+    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" />
+    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />
+    <uses-permission android:name="android.permission.BLUETOOTH" />
+    <uses-permission android:name="android.permission.BLUETOOTH_ADMIN" />
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION"/>
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION"/>
 
     <application android:allowBackup="true"
         android:debuggable="true"
         android:label="@string/app_name"
-        android:icon="@drawable/ic_launcher"
         android:theme="@style/MaterialTheme">
 
         <activity android:name="org.tensorflow.demo.ClassifierActivity"
@@ -40,6 +45,24 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+
+        <meta-data
+            android:name="clientid"
+            android:value="023128549727ed863470b0f6f9ed50e591692ea7" />
+        <meta-data
+            android:name="secret"
+            android:value="0e0877bac741332cd2fee3f8ae5452cf62dc626e" />
+        <provider
+            android:name="com.onyxbeaconservice.provider.IBeaconProvider"
+            android:authorities="org.tensorflow.demo.provider"
+            android:enabled="true"
+            android:exported="true" />
+
+        <receiver android:name=".beacon.ContentReceiver">
+            <intent-filter>
+                <action android:name="org.tensorflow.demo.beacon.content" />
+            </intent-filter>
+        </receiver>
     </application>
 
 </manifest>

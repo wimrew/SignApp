@@ -16,6 +16,8 @@
 
 package org.tensorflow.demo;
 
+import android.content.Context;
+import android.content.IntentFilter;
 import android.graphics.Bitmap;
 import android.graphics.Bitmap.Config;
 import android.graphics.BitmapFactory;
@@ -31,17 +33,29 @@ import android.os.Bundle;
 import android.os.Handler;
 import android.os.SystemClock;
 import android.os.Trace;
+import android.support.v4.content.ContextCompat;
 import android.util.Log;
 import android.util.Size;
 import android.util.TypedValue;
 import android.view.Display;
 import android.view.View;
 import android.widget.ImageView;
+import android.widget.TextView;
+
+import com.onyxbeacon.OnyxBeaconApplication;
+import com.onyxbeacon.OnyxBeaconManager;
+import com.onyxbeacon.listeners.OnyxBeaconsListener;
+import com.onyxbeacon.rest.auth.util.AuthenticationMode;
+import com.onyxbeaconservice.IBeacon;
 
 import java.util.List;
 import java.util.Vector;
+import java.util.jar.Manifest;
 
 import org.tensorflow.demo.OverlayView.DrawCallback;
+import org.tensorflow.demo.beacon.BleStateListener;
+import org.tensorflow.demo.beacon.BleStateReceiver;
+import org.tensorflow.demo.beacon.ContentReceiver;
 import org.tensorflow.demo.env.BorderedText;
 import org.tensorflow.demo.env.ImageUtils;
 import org.tensorflow.demo.env.Logger;
@@ -50,8 +64,11 @@ import butterknife.BindView;
 import butterknife.ButterKnife;
 import butterknife.OnClick;
 
-public class ClassifierActivity extends CameraActivity implements OnImageAvailableListener {
+public class ClassifierActivity extends CameraActivity implements BleStateListener,OnImageAvailableListener ,OnyxBeaconsListener{
     private static final Logger LOGGER = new Logger();
+    private OnyxBeaconManager mManager;
+    private ContentReceiver contentReceiver;
+    private BleStateReceiver mBleReceiver;
 
     // These are the settings for the original v1 Inception model. If you want to
     // use a model that's been produced from the TensorFlow for Poets codelab,
@@ -150,6 +167,8 @@ public class ClassifierActivity extends CameraActivity implements OnImageAvailab
 
     private long lastProcessingTimeMs;
 
+    private String textToSend= "";
+
     private HololensCommunication hololensCommunication;
     private int interval = 1000; // 5 seconds by default, can be changed later
     private Handler handler;
@@ -185,7 +204,25 @@ public class ClassifierActivity extends CameraActivity implements OnImageAvailab
         handler = new Handler();
         startRepeatingTask();
         // submit(null);
+
+
+        Context context = this.getApplicationContext();
+        mManager = OnyxBeaconApplication.getOnyxBeaconManager(context);
+        contentReceiver=new ContentReceiver(this);
+        contentReceiver.setOnyxBeaconsListener(this);
+
+        mBleReceiver = BleStateReceiver.getInstance();
+        mBleReceiver.setBleStateListener(this);
+        if (mManager.isBluetoothAvailable()) {
+            mManager.initSDK(AuthenticationMode.CLIENT_SECRET_BASED);
+            mManager.setCouponEnabled(true);
+            mManager.setAPIContentEnabled(true);
+        } else {
+            mManager.enableBluetooth();
+        }
     }
+
+
 
     @Override
     protected int getLayoutId() {
@@ -435,5 +472,73 @@ public class ClassifierActivity extends CameraActivity implements OnImageAvailab
     public void onDestroy() {
         super.onDestroy();
         stopRepeatingTask();
+    }
+
+    @Override
+    public void onResume() {
+        super.onResume();
+        mManager=OnyxBeaconApplication.getOnyxBeaconManager(this);
+        contentReceiver = new ContentReceiver(this);
+        mManager.setForegroundMode(true);
+        registerReceiver(contentReceiver, new IntentFilter("bacon.accenture.com.beacon.content"));
+
+    }
+
+    @Override
+    public void onPause() {
+        super.onPause();
+        unregisterReceiver(contentReceiver);
+        mManager.setForegroundMode(false);
+    }
+
+    @Override
+    public void didRangeBeaconsInRegion(List<IBeacon> list) {
+        for (IBeacon iBeacon:list){
+            if (iBeacon.getProximity()==1){
+                if (iBeacon.getMinor()==6689){
+                    //dormitor
+                    Log.e("In apropiere ","dormitor");
+
+                    String text = "You have arrived to the reception area";
+                    sendMessageToHololens(text);
+                }else if (iBeacon.getMinor()==6657){
+                    //baie
+                    Log.e("In apropiere","baie");
+
+                    String text = "You have arrived to the payments area";
+                    sendMessageToHololens(text);
+                }else if (iBeacon.getMinor()==6714){
+                    //bucatarie
+                    Log.e("In apropiere","bucatarie");
+                    String url = baseAddress +
+                            "sendText";
+                    String text = "You have arrived to somewhere";
+                    sendMessageToHololens(text);
+                }
+            }
+        }
+        Log.e("Beacons ",list.toString());
+        Log.d("Beacons ",list.toString());
+    }
+
+    public void sendMessageToHololens(String message){
+        if( !message.equals(textToSend)) {
+            String url = baseAddress +
+                    "sendText";
+            hololensCommunication.sendToHoloLensPost(url, "{\"result\":\"" + message + "\"}");
+            textToSend = message;
+        }
+    }
+
+    @Override
+    public void onError(int i, Exception e) {
+        Log.e("Beacons ",e.toString());
+        Log.d("Beacons ",e.toString());
+    }
+
+    @Override
+    public void onBleStackEvent(int event) {
+        Log.e("Beacons ", String.valueOf(event));
+        Log.d("Beacons ", String.valueOf(event));
     }
 }
